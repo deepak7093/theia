@@ -264,14 +264,17 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
     }
 
     protected async loadPlugin(plugin: Plugin, configStorage: ConfigStorage, visited = new Set<string>()): Promise<boolean> {
+        console.error('=============== THEIA === load plugin ', plugin.model.id);
         // in order to break cycles
         if (visited.has(plugin.model.id)) {
+            console.error('==== THEIA === load plugin === RETURN ', plugin.model.id);
             return true;
         }
         visited.add(plugin.model.id);
 
         let loading = this.loadedPlugins.get(plugin.model.id);
         if (!loading) {
+            console.error('==== THEIA === load plugin === NOT loading ', plugin.model.id);
             loading = (async () => {
                 const progressId = await this.notificationMain.$startProgress({
                     title: `Activating ${plugin.model.displayName || plugin.model.name}`,
@@ -279,6 +282,7 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
                 });
                 try {
                     if (plugin.rawModel.extensionDependencies) {
+                        console.error('==== THEIA === load plugin === plugin.rawModel.extensionDependencies ', plugin.model.id);
                         for (const dependencyId of plugin.rawModel.extensionDependencies) {
                             const dependency = this.registry.get(dependencyId.toLowerCase());
                             if (dependency) {
@@ -290,14 +294,20 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
                                 throw new Error(`Dependent extension '${dependencyId}' is not installed.`);
                             }
                         }
+                    } else {
+                        console.error('==== THEIA === load plugin === NOT plugin.rawModel.extensionDependencies ', plugin.model.id);
                     }
 
+                    console.error('==== THEIA === load plugin === BEFORE host loadplugin ', plugin.model.id);
                     let pluginMain = this.host.loadPlugin(plugin);
+                    console.error('==== THEIA === load plugin === AFTER host loadplugin ', plugin.model.id);
                     // see https://github.com/TypeFox/vscode/blob/70b8db24a37fafc77247de7f7cb5bb0195120ed0/src/vs/workbench/api/common/extHostExtensionService.ts#L372-L376
                     pluginMain = pluginMain || {};
                     await this.startPlugin(plugin, configStorage, pluginMain);
+                    console.error('==== THEIA === load plugin === AFTER start plugin ', plugin.model.id);
                     return true;
                 } catch (err) {
+                    console.error('==== THEIA === load plugin === ERROR ', plugin.model.id);
                     const message = `Activating extension '${plugin.model.displayName || plugin.model.name}' failed:`;
                     this.messageRegistryProxy.$showMessage(MainMessageType.Error, message + ' ' + err.message, {}, []);
                     console.error(message, err);
@@ -342,12 +352,14 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private async startPlugin(plugin: Plugin, configStorage: ConfigStorage, pluginMain: any): Promise<void> {
+        console.error('*************** THEIA *** START plugin *** ', plugin.model.id);
         const subscriptions: theia.Disposable[] = [];
         const asAbsolutePath = (relativePath: string): string => join(plugin.pluginFolder, relativePath);
         const logPath = join(configStorage.hostLogPath, plugin.model.id); // todo check format
         const storagePath = configStorage.hostStoragePath ? join(configStorage.hostStoragePath, plugin.model.id) : undefined;
         const secrets = new SecretStorageExt(plugin, this.secrets);
         const globalStoragePath = join(configStorage.hostGlobalStoragePath, plugin.model.id);
+        console.error('*** THEIA *** START plugin *** BEFORE plugin context ', plugin.model.id);
         const pluginContext: theia.PluginContext = {
             extensionPath: plugin.pluginFolder,
             extensionUri: Uri.file(plugin.pluginFolder),
@@ -363,6 +375,7 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
             globalStorageUri: Uri.file(globalStoragePath),
             environmentVariableCollection: this.terminalService.getEnvironmentVariableCollection(plugin.model.id)
         };
+        console.error('*** THEIA *** START plugin *** AFTER plugin context ', plugin.model.id);
         this.pluginContextsMap.set(plugin.model.id, pluginContext);
 
         let stopFn = undefined;
@@ -371,12 +384,16 @@ export class PluginManagerExtImpl implements PluginManagerExt, PluginManager {
         }
         const id = plugin.model.displayName || plugin.model.id;
         if (typeof pluginMain[plugin.lifecycle.startMethod] === 'function') {
+            console.error('*** THEIA *** START plugin *** BEFORE plugin main ', plugin.model.id);
             const pluginExport = await pluginMain[plugin.lifecycle.startMethod].apply(getGlobal(), [pluginContext]);
+            console.error('*** THEIA *** START plugin *** AFTER plugin main ', plugin.model.id);
             this.activatedPlugins.set(plugin.model.id, new ActivatedPlugin(pluginContext, pluginExport, stopFn));
         } else {
             // https://github.com/TypeFox/vscode/blob/70b8db24a37fafc77247de7f7cb5bb0195120ed0/src/vs/workbench/api/common/extHostExtensionService.ts#L400-L401
             console.log(`plugin ${id}, ${plugin.lifecycle.startMethod} method is undefined so the module is the extension's exports`);
+            console.error('*** THEIA *** START plugin *** BEFORE new activated plugin ', plugin.model.id);
             this.activatedPlugins.set(plugin.model.id, new ActivatedPlugin(pluginContext, pluginMain));
+            console.error('*** THEIA *** START plugin *** AFTER new activated plugin ', plugin.model.id);
         }
     }
 

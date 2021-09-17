@@ -109,6 +109,7 @@ export class PluginHostRPC {
         const pluginManager = new PluginManagerExtImpl({
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             loadPlugin(plugin: Plugin): any {
+                console.error('////////////// THEIA /// PLUGIN MANAGER load plugin ', plugin.model.id);
                 console.log('PLUGIN_HOST(' + process.pid + '): PluginManagerExtImpl/loadPlugin(' + plugin.pluginPath + ')');
                 // cleaning the cache for all files of that plug-in.
                 Object.keys(require.cache).forEach(function (key): void {
@@ -116,6 +117,7 @@ export class PluginHostRPC {
 
                     // attempting to reload a native module will throw an error, so skip them
                     if (mod.id.endsWith('.node')) {
+                        console.error('/// THEIA /// PLUGIN MANAGER load plugin /// RETURN ', plugin.model.id);
                         return;
                     }
 
@@ -146,7 +148,12 @@ export class PluginHostRPC {
 
                 });
                 if (plugin.pluginPath) {
-                    return dynamicRequire(plugin.pluginPath);
+                    console.error('/// THEIA /// PLUGIN MANAGER load plugin /// BEFORE dynamic require ', plugin.model.id);
+                    const ttt = dynamicRequire(plugin.pluginPath);
+                    console.error('/// THEIA /// PLUGIN MANAGER load plugin /// AFTER dynamic require ', plugin.model.id);
+                    return ttt;
+                } else {
+                    console.error('/// THEIA /// PLUGIN MANAGER load plugin /// NOT dynamic require ', plugin.model.id);
                 }
             },
             async init(raw: PluginMetadata[]): Promise<[Plugin[], Plugin[]]> {
