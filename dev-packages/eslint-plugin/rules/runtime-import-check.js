@@ -17,7 +17,9 @@
 
 const path = require('path');
 
-/** Code organization folders in the project */
+/**
+ * Runtime-specific folders according to our coding guidelines.
+ */
 const folders = {
     common: '/common/',
     browser: '/browser/',
@@ -28,7 +30,10 @@ const folders = {
     electronMain: '/electron-main/',
 };
 
-/** The mapping of folders to their restricted folders. */
+/**
+ * Mapping of folders to the list of folders it should not import from.
+ * @type {[string, string[]][]}
+ */
 const restrictedMapping = [
     // We start by declaring the allowed imports, we'll negate those later.
     [folders.common, []],
@@ -38,14 +43,11 @@ const restrictedMapping = [
     [folders.electronBrowser, [folders.electronCommon, folders.browser, folders.common]],
     [folders.electronNode, [folders.electronCommon, folders.node, folders.common]],
     [folders.electronMain, [folders.electronCommon, folders.node, folders.common]]
-].map(
-    // Convert the mapping from "allowed" to a list of "restricted" folders.
-    ([folder, allowed]) => /** @type {[string, string[]]} */([
-        // We want to restrict everything that's either not `folder` nor in the list of allowed folders.
-        folder,
-        Object.values(folders).filter(f => f !== folder && !allowed.includes(f))
-    ])
-);
+    // Next we convert the mapping from "allowed" to a list of "restricted" folders.
+].map(([folder, allowed]) => /** @type {[string, string[]]} */(
+    // We want to restrict everything that's either not `folder` nor in the list of allowed folders.
+    [folder, Object.values(folders).filter(f => f !== folder && !allowed.includes(f))]
+));
 
 /** @type {import('eslint').Rule.RuleModule} */
 module.exports = {
@@ -58,36 +60,30 @@ module.exports = {
         },
     },
     create(context) {
-        const relativeFilePath = path.relative(context.getCwd(), path.resolve(context.getFilename()));
-
-        /**
-         * Check if the import is valid according to out code organization guidelines:
-         * - https://github.com/eclipse-theia/theia/wiki/Code-Organization
-         * @param {*} node
-         */
-        function checkModuleImport(node) {
-            const module = /** @type {string} */(node.value);
-
-            let leftMostIndex = Infinity;
-            let restrictedFolders;
-            let matchedFolder;
-
-            for (const [folder, restricted] of restrictedMapping) {
-                const indexOf = relativeFilePath.indexOf(folder);
-                if (indexOf !== -1 && indexOf < leftMostIndex) {
-                    restrictedFolders = restricted;
-                    matchedFolder = folder;
-                    leftMostIndex = indexOf;
-                }
-            }
-            if (restrictedFolders && restrictedFolders.some(folder => module.includes(folder))) {
-                context.report({
-                    node,
-                    message: `${module} cannot be imported in '${matchedFolder}'`
-                });
+        let relativeFilePath = path.relative(context.getCwd(), context.getFilename());
+        // Normalize the path so we only deal with forward slashes.
+        if (process.platform === 'win32') {
+            relativeFilePath = relativeFilePath.replace(/\\/g, '/');
+        }
+        // Search for a folder following our naming conventions, keep the left-most match.
+        // e.g. `src/electron-node/browser/node/...` should match `electron-node`
+        let lowestIndex = Infinity;
+        /** @type {string[] | undefined} */
+        let restrictedFolders;
+        /** @type {string | undefined} */
+        let matchedFolder;
+        for (const [folder, restricted] of restrictedMapping) {
+            const index = relativeFilePath.indexOf(folder);
+            if (index !== -1 && index < lowestIndex) {
+                restrictedFolders = restricted;
+                matchedFolder = folder;
+                lowestIndex = index;
             }
         }
-
+        // File doesn't follow our naming convention so we'll bail now.
+        if (matchedFolder === undefined) {
+            return {};
+        }
         return {
             ImportDeclaration(node) {
                 checkModuleImport(node.source);
@@ -95,6 +91,15 @@ module.exports = {
             TSExternalModuleReference(node) {
                 checkModuleImport(node.expression);
             },
+        }
+        function checkModuleImport(node) {
+            const module = /** @type {string} */(node.value);
+            if (restrictedFolders.some(restricted => module.includes(restricted))) {
+                context.report({
+                    node,
+                    message: `${module} cannot be imported in '${matchedFolder}'`
+                });
+            }
         }
     },
 }
