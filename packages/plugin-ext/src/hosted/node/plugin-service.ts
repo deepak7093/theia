@@ -90,7 +90,6 @@ export class HostedPluginServerImpl implements HostedPluginServer {
         if (!pluginIds.length) {
             return [];
         }
-        const locale = this.localizationProvider.getCurrentLanguage();
         const plugins = [];
         let extraDeployedPlugins: Map<string, DeployedPlugin> | undefined;
         for (const pluginId of pluginIds) {
@@ -105,7 +104,7 @@ export class HostedPluginServerImpl implements HostedPluginServer {
                 plugin = extraDeployedPlugins.get(pluginId);
             }
             if (plugin) {
-                plugins.push(await this.localizePlugin(plugin, locale));
+                plugins.push(plugin);
             }
         }
         return plugins;
