@@ -149,7 +149,8 @@ export class PluginHostRPC {
                 });
                 if (plugin.pluginPath) {
                     console.error('/// THEIA /// PLUGIN MANAGER load plugin /// BEFORE dynamic require ', plugin.model.id);
-                    const ttt = dynamicRequire(plugin.pluginPath);
+                    // eslint-disable-next-line import/no-dynamic-require
+                    const ttt = require(plugin.pluginPath);
                     console.error('/// THEIA /// PLUGIN MANAGER load plugin /// AFTER dynamic require ', plugin.model.id);
                     return ttt;
                 } else {
